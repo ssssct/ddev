@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	composeSpecCli "github.com/compose-spec/compose-go/v2/cli"
 	"github.com/ddev/ddev/pkg/archive"
 	ddevImages "github.com/ddev/ddev/pkg/docker"
 	ddevexec "github.com/ddev/ddev/pkg/exec"
@@ -1842,4 +1843,35 @@ func GetLiveDockerComposeVersion() (string, error) {
 // Used as a wrapper to avoid direct import for docker client.
 func IsErrNotFound(err error) bool {
 	return dockerClient.IsErrNotFound(err)
+}
+
+// PrepareConfigYAML takes a list of compose files and returns a YAML string
+// This is an alternative to `docker-compose config`
+func PrepareConfigYAML(files []string) (string, error) {
+	options, err := composeSpecCli.NewProjectOptions(
+		files,
+		// TODO: choose the appropriate config
+		// See https://github.com/docker/compose/blob/main/cmd/compose/config.go#L66-L75
+		composeSpecCli.WithOsEnv,
+		composeSpecCli.WithDotEnv,
+		composeSpecCli.WithConfigFileEnv,
+		composeSpecCli.WithDefaultConfigPath,
+		composeSpecCli.WithEnvFiles(),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	project, err := options.LoadProject(context.Background())
+	if err != nil {
+		return "", err
+	}
+
+	fullContents, err := project.MarshalYAML()
+
+	if err != nil {
+		return "", err
+	}
+
+	return string(fullContents), nil
 }
